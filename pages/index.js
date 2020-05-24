@@ -1,191 +1,183 @@
-import Head from 'next/head'
+import React, {useReducer, useState, useCallback, useEffect, useRef} from 'react';
+import Head from 'next/head';
+import CardList from '../Components/CardList';
+import Filter from '../Components/Filter';
+import FilterChips from '../Components/FilterChips';
+import SearchInput from '../Components/SearchInput';
+import filterReducer from '../Components/Filter/reducer.js';
+import {getCharacters} from '../Services/Rest';
 
-export default function Home() {
+export default function Home(props) {
+  const didMountRef = useRef(true);
+  const [data, setData] = useState(props.data);
+  const [speciesFilter, updateSpeciesFilter] = useReducer(filterReducer, []);
+  const [genderFilter, updateGenderFilter] = useReducer(filterReducer, []);
+  const [searchCharName, setSearchName] = useState('');
+  const [isAsec, setSort] = useState(true);
+  const toggleSort = useCallback(() => {
+    setSort(!isAsec);
+  });
+  useEffect(() => {
+    if (didMountRef.current) {
+      didMountRef.current = false;
+    } else {
+      let queryString = '';
+      let genderFilterText = !!genderFilter.length && 'gender=' + genderFilter.join('|');
+      if (genderFilterText) {
+        queryString += genderFilterText;
+      }
+      let speciesFilterText = !!speciesFilter.length && 'species=' + speciesFilter.join('|');
+      if (speciesFilterText) {
+        queryString += '&' + speciesFilterText;
+      }
+      if (searchCharName) {
+        queryString += '&name=' + searchCharName;
+      }
+
+      getCharacters(queryString)
+        .then(({data}) => {
+          setData(data);
+        })
+        .catch(({response} = {}) => {
+          if (response && response.status === 404) {
+            setData({results: []});
+          }
+        });
+    }
+  }, [genderFilter, speciesFilter, searchCharName]);
+  const removeFilter = useCallback((filter, value) => {
+    if (filter === 'gender') {
+      return updateGenderFilter({type: 'remove', data: value});
+    } else if (filter === 'species') {
+      return updateSpeciesFilter({type: 'remove', data: value});
+    }
+  });
   return (
-    <div className="container">
+    <>
       <Head>
-        <title>Create Next App</title>
+        <title>Rick and Morty App</title>
         <link rel="icon" href="/favicon.ico" />
+        <link href="https://fonts.googleapis.com/css2?family=Balsamiq+Sans&display=swap" rel="stylesheet"></link>
       </Head>
-
-      <main>
-        <h1 className="title">
-          Welcome to <a href="https://nextjs.org">Next.js!</a>
-        </h1>
-
-        <p className="description">
-          Get started by editing <code>pages/index.js</code>
-        </p>
-
-        <div className="grid">
-          <a href="https://nextjs.org/docs" className="card">
-            <h3>Documentation &rarr;</h3>
-            <p>Find in-depth information about Next.js features and API.</p>
-          </a>
-
-          <a href="https://nextjs.org/learn" className="card">
-            <h3>Learn &rarr;</h3>
-            <p>Learn about Next.js in an interactive course with quizzes!</p>
-          </a>
-
-          <a
-            href="https://github.com/zeit/next.js/tree/master/examples"
-            className="card"
-          >
-            <h3>Examples &rarr;</h3>
-            <p>Discover and deploy boilerplate example Next.js projects.</p>
-          </a>
-
-          <a
-            href="https://vercel.com/import?filter=next.js&utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className="card"
-          >
-            <h3>Deploy &rarr;</h3>
-            <p>
-              Instantly deploy your Next.js site to a public URL with Vercel.
-            </p>
-          </a>
+      <header className="visually-hidden">
+        <h1 aria-hidden="true">Rick and Morty App</h1>
+      </header>
+      <main className="flex main-container">
+        <aside className="flex filter-section">
+          <h2 className="filter-title">Filters</h2>
+          <div className="flex filter-list">
+            <Filter
+              options={['Male', 'Female']}
+              title="Gender"
+              handleFilterChange={updateGenderFilter}
+              values={genderFilter}
+            />
+            <Filter
+              options={['Human', 'Alien']}
+              title="Species"
+              handleFilterChange={updateSpeciesFilter}
+              isRadioType
+              values={speciesFilter}
+            />
+          </div>
+        </aside>
+        <div className="section-left">
+          <section className="search-section">
+            <FilterChips filters={{gender: genderFilter, species: speciesFilter}} removeFilter={removeFilter} />
+            <div className="flex search-row">
+              <SearchInput title="Filter by Name" onSearch={setSearchName} />
+              <button onClick={toggleSort} className="sort-button">
+                Sorted by ID {isAsec ? <>&uarr;</> : <>&darr;</>}
+              </button>
+            </div>
+          </section>
+          <section className="caracterlist-section">
+            <CardList data={isAsec ? data.results : data.results.slice().reverse()} />
+          </section>
         </div>
       </main>
 
-      <footer>
-        <a
-          href="https://vercel.com?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Powered by{' '}
-          <img src="/vercel.svg" alt="Vercel Logo" className="logo" />
-        </a>
-      </footer>
-
       <style jsx>{`
-        .container {
-          min-height: 100vh;
-          padding: 0 0.5rem;
-          display: flex;
+        .main-container {
           flex-direction: column;
-          justify-content: center;
-          align-items: center;
         }
-
-        main {
-          padding: 5rem 0;
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          align-items: center;
-        }
-
-        footer {
+        .filter-section {
           width: 100%;
-          height: 100px;
-          border-top: 1px solid #eaeaea;
+          flex-direction: column;
+        }
+        .filter-list {
+          border-top: 2px solid #edebef;
+          border-bottom: 2px solid #edebef;
+        }
+        .filter-title {
+          padding: 10px;
+        }
+
+        .section-left {
           display: flex;
-          justify-content: center;
-          align-items: center;
+          flex-direction: column;
         }
 
-        footer img {
-          margin-left: 0.5rem;
+        .search-section {
+          padding: 0 10px;
         }
 
-        footer a {
+        .search-row {
+          flex-direction: column;
+          padding: 10px 0;
+          flex: 1;
+        }
+
+        .sort-button {
+          border: 1px solid #d4d5d9;
+          margin-top: 10px;
+          font-size: 14px;
+          color: #333;
+          background-color: #fff;
+          border-color: #ccc;
+        }
+
+        .caracterlist-section {
           display: flex;
-          justify-content: center;
-          align-items: center;
-        }
-
-        a {
-          color: inherit;
-          text-decoration: none;
-        }
-
-        .title a {
-          color: #0070f3;
-          text-decoration: none;
-        }
-
-        .title a:hover,
-        .title a:focus,
-        .title a:active {
-          text-decoration: underline;
-        }
-
-        .title {
-          margin: 0;
-          line-height: 1.15;
-          font-size: 4rem;
-        }
-
-        .title,
-        .description {
-          text-align: center;
-        }
-
-        .description {
-          line-height: 1.5;
-          font-size: 1.5rem;
-        }
-
-        code {
-          background: #fafafa;
-          border-radius: 5px;
-          padding: 0.75rem;
-          font-size: 1.1rem;
-          font-family: Menlo, Monaco, Lucida Console, Liberation Mono,
-            DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace;
-        }
-
-        .grid {
-          display: flex;
-          align-items: center;
-          justify-content: center;
+          flex: 1;
           flex-wrap: wrap;
-
-          max-width: 800px;
-          margin-top: 3rem;
+          max-width: 100%;
         }
 
-        .card {
-          margin: 1rem;
-          flex-basis: 45%;
-          padding: 1.5rem;
-          text-align: left;
-          color: inherit;
-          text-decoration: none;
-          border: 1px solid #eaeaea;
-          border-radius: 10px;
-          transition: color 0.15s ease, border-color 0.15s ease;
-        }
+        @media only screen and (min-width: 768px) {
+          .main-container {
+            flex-direction: row;
+          }
+          .filter-section {
+            border-right: 2px solid #edebef;
+          }
 
-        .card:hover,
-        .card:focus,
-        .card:active {
-          color: #0070f3;
-          border-color: #0070f3;
-        }
-
-        .card h3 {
-          margin: 0 0 1rem 0;
-          font-size: 1.5rem;
-        }
-
-        .card p {
-          margin: 0;
-          font-size: 1.25rem;
-          line-height: 1.5;
-        }
-
-        .logo {
-          height: 1em;
-        }
-
-        @media (max-width: 600px) {
-          .grid {
-            width: 100%;
+          .filter-title {
+            padding: 10px;
+            border-bottom: 2px solid #edebef;
+          }
+          .filter-list {
+            border: none;
             flex-direction: column;
+          }
+          .section-left {
+            flex: 4;
+          }
+          .search-section {
+            padding: 10px;
+          }
+          .sort-button {
+            margin: 0;
+          }
+          .caracterlist-section {
+            display: flex;
+            flex: 1;
+            flex-wrap: wrap;
+          }
+          .search-row {
+            justify-content: space-between;
+            padding: 10px 0;
+            flex-direction: row;
           }
         }
       `}</style>
@@ -194,16 +186,58 @@ export default function Home() {
         html,
         body {
           padding: 0;
-          margin: 0;
-          font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto,
-            Oxygen, Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue,
-            sans-serif;
+          margin: 0 auto;
+          font-family: Balsamiq Sans, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell,
+            Fira Sans, Droid Sans, Helvetica Neue, sans-serif;
         }
 
         * {
           box-sizing: border-box;
         }
+
+        .visually-hidden {
+          clip: rect(0 0 0 0);
+          height: 1px;
+          width: 1px;
+          margin: -1px;
+          padding: 0;
+          border: 0;
+          overflow: hidden;
+          position: absolute;
+        }
+        .flex {
+          display: flex;
+          flex: 1;
+        }
+
+        .flex-column {
+          display: flex;
+          flex: 1;
+          flex-direction: column;
+        }
+
+        .inline-flex-column {
+          display: inline-flex;
+          flex-direction: column;
+        }
+
+        .flex-center {
+          display: flex;
+          flex: 1;
+          align-items: center;
+          justify-content: center;
+        }
       `}</style>
-    </div>
-  )
+    </>
+  );
+}
+
+export async function getStaticProps() {
+  const {data} = await getCharacters();
+
+  return {
+    props: {
+      data: data,
+    },
+  };
 }
